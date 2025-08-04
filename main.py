@@ -10,7 +10,7 @@ class TextInput(BaseModel):
 @app.post("/generate-audio")
 def generate_audio(input: TextInput):
     # Replace with your actual Murf TTS API key
-    murf_api_key = "ap2_d5d04dfc-c299-4cd1-9702-0cee60d680ab"
+    murf_api_key = ""
 
     murf_endpoint = "https://api.murf.ai/v1/speech/generate"
 
