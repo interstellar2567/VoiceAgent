@@ -3,35 +3,147 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Text to Speech Player</title>
+    <title>AI Voice Agents</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: darkgrey;
+            padding: 2rem;
+            color: #333;
+        }
+
+        h1 {
+            color: black;
+            margin-top: 3rem;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        .section {
+            background: lightseagreen;
+            padding: 2rem;
+            margin-top: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            width: 80%;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 0.5rem 0.5rem 1rem 0;
+            font-size: 1rem;
+            background-color: dimgrey;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #357ABD;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 1rem;
+        }
+    </style>
 </head>
 <body>
-<h2>Enter Text for TTS</h2>
-<input type="text" id="textInput" placeholder="Type something..." />
-<button onclick="generateAudio()">Generate & Play</button>
 
-<h3>Audio Output:</h3>
-<audio id="audioPlayer" controls></audio>
+<!-- TTS Section -->
+<div class="section">
+    <h1>Text to Speech</h1>
+    <input type="text" id="textInput" placeholder="Type something..." />
+    <br>
+    <button onclick="generateAudio()">Generate & Play</button>
+
+    <audio id="audioPlayer" controls></audio>
+</div>
+
+<!-- Echo Bot Section -->
+<div class="section">
+    <h1>Echo Bot</h1>
+    <button id="startBtn">Start Recording</button>
+    <button id="stopBtn" disabled>Stop Recording</button>
+
+    <audio id="echoAudio" controls></audio>
+</div>
 
 <script>
+    // TTS
     async function generateAudio() {
         const text = document.getElementById("textInput").value;
-
         const response = await fetch("http://localhost:8000/generate", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ text: text })
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text })
         });
 
         const data = await response.json();
-        const audioUrl = data.audio_url; // adjust key based on your Day 2 API response
+        const audioUrl = data.audio_url;
 
-        const audioPlayer = document.getElementById("audioPlayer");
-        audioPlayer.src = audioUrl;
-        audioPlayer.play();
+        const player = document.getElementById("audioPlayer");
+        player.src = audioUrl;
+        player.play();
     }
+
+    // Echo Bot
+    let mediaRecorder;
+    let audioChunks = [];
+
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const echoAudio = document.getElementById("echoAudio");
+
+    startBtn.onclick = async () => {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = event => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            echoAudio.src = audioUrl;
+            echoAudio.play();
+        };
+
+        mediaRecorder.start();
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+    };
+
+    stopBtn.onclick = () => {
+        mediaRecorder.stop();
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+    };
 </script>
 </body>
 </html>
