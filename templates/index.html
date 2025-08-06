@@ -1,140 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>AI Voice Agents</title>
+    <meta charset="UTF-8">
+    <title>Voice Recorder</title>
     <style>
         body {
-            font-family: 'Segoe UI', sans-serif;
-            background-color: darkgrey;
-            padding: 2rem;
-            color: #333;
-        }
-
-        h1 {
-            color: black;
-            margin-top: 3rem;
-        }
-
-        h2 {
-            color: #333;
-        }
-
-        .section {
-            background: lightseagreen;
-            padding: 2rem;
-            margin-top: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        input[type="text"] {
-            padding: 10px;
-            width: 80%;
-            margin-bottom: 1rem;
-            font-size: 1rem;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-        }
-
-        button {
-            padding: 10px 20px;
-            margin: 0.5rem 0.5rem 1rem 0;
-            font-size: 1rem;
-            background-color: dimgrey;
+            background-color: black;
             color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
+            text-align: center;
+            font-family: sans-serif;
+            padding: 2rem;
         }
-
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
+        button {
+            margin: 1rem;
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
         }
-
-        button:hover:not(:disabled) {
-            background-color: #357ABD;
-        }
-
-        audio {
-            width: 100%;
+        #status {
             margin-top: 1rem;
         }
     </style>
 </head>
 <body>
-
-<!-- TTS Section -->
-<div class="section">
-    <h1>Text to Speech</h1>
-    <input type="text" id="textInput" placeholder="Type something..." />
-    <br>
-    <button onclick="generateAudio()">Generate & Play</button>
-
-    <audio id="audioPlayer" controls></audio>
-</div>
-
-<!-- Echo Bot Section -->
-<div class="section">
-    <h1>Echo Bot</h1>
-    <button id="startBtn">Start Recording</button>
-    <button id="stopBtn" disabled>Stop Recording</button>
-
-    <audio id="echoAudio" controls></audio>
-</div>
+<h1>Voice Recorder</h1>
+<button id="start">Start Recording</button>
+<button id="stop" disabled>Stop Recording</button>
+<p id="status">Not recording</p>
 
 <script>
-    // TTS
-    async function generateAudio() {
-        const text = document.getElementById("textInput").value;
-        const response = await fetch("http://localhost:8000/generate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text })
-        });
-
-        const data = await response.json();
-        const audioUrl = data.audio_url;
-
-        const player = document.getElementById("audioPlayer");
-        player.src = audioUrl;
-        player.play();
-    }
-
-    // Echo Bot
     let mediaRecorder;
-    let audioChunks = [];
+    let chunks = [];
 
-    const startBtn = document.getElementById("startBtn");
-    const stopBtn = document.getElementById("stopBtn");
-    const echoAudio = document.getElementById("echoAudio");
+    const startBtn = document.getElementById("start");
+    const stopBtn = document.getElementById("stop");
+    const statusText = document.getElementById("status");
 
     startBtn.onclick = async () => {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream);
-
-        audioChunks = [];
-
-        mediaRecorder.ondataavailable = event => {
-            if (event.data.size > 0) {
-                audioChunks.push(event.data);
-            }
-        };
-
-        mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            echoAudio.src = audioUrl;
-            echoAudio.play();
-        };
-
         mediaRecorder.start();
+        statusText.textContent = "Recording...";
+
+        mediaRecorder.ondataavailable = e => {
+            chunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+            const blob = new Blob(chunks, { type: "audio/webm" });
+            const formData = new FormData();
+            formData.append("file", blob, "recording.webm");
+
+            statusText.textContent = "Uploading...";
+            try {
+                const res = await fetch("http://127.0.0.1:8000/upload-audio", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+                statusText.textContent = `Uploaded: ${data.filename} (${data.size} bytes)`;
+            } catch (err) {
+                statusText.textContent = "Upload failed!";
+                console.error(err);
+            }
+
+            chunks = [];
+        };
+
         startBtn.disabled = true;
         stopBtn.disabled = false;
     };

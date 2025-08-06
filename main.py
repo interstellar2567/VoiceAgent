@@ -1,33 +1,35 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-import requests
+from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+import os
+from datetime import datetime
+
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = FastAPI()
 
-class TextInput(BaseModel):
-    text: str
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.post("/generate-audio")
-def generate_audio(input: TextInput):
-    # Replace with your actual Murf TTS API key
-    murf_api_key = "ap2_d5d04dfc-c299-4cd1-9702-0cee60d680ab"
+@app.post("/upload-audio")
+async def upload_audio(file: UploadFile = File(...)):
+    filename = f"{datetime.utcnow().timestamp()}_{file.filename}"
+    filepath = os.path.join(UPLOAD_DIR, filename)
 
-    murf_endpoint = "https://api.murf.ai/v1/speech/generate"
+    with open(filepath, "wb") as f:
+        content = await file.read()
+        f.write(content)
 
-    payload = {
-        "text": input.text,
-        "voice": "en-US-Wavenet-D"  # Example voice
+    return {
+        "filename": filename,
+        "content_type": file.content_type,
+        "size": len(content)
     }
 
-    headers = {
-        "Authorization": f"Bearer {murf_api_key}",
-        "Content-Type": "application/json"
-    }
-
-    response = requests.post(murf_endpoint, json=payload, headers=headers)
-
-    if response.status_code == 200:
-        result = response.json()
-        return {"audio_url": result.get("audio_url")}
-    else:
-        return {"error": "Failed to generate audio", "details": response.text}
+@app.get("/")
+def home():
+    return {"message": "Hello! FastAPI server is running."}
